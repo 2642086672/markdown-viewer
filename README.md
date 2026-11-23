@@ -1,8 +1,18 @@
 # MD Viewer
 
+[![Build & Release](https://github.com/2642086672/markdown-viewer/actions/workflows/build.yml/badge.svg)](https://github.com/2642086672/markdown-viewer/actions/workflows/build.yml)
+[![GitHub release](https://img.shields.io/github/v/release/2642086672/markdown-viewer)](https://github.com/2642086672/markdown-viewer/releases/latest)
+
 一款轻量、纯本地、零第三方运行时依赖的 Markdown 阅读器，基于 Electron 构建。支持 Windows 与 macOS。
 
 ![MD Viewer 截图](docs/screenshot.png)
+
+<details>
+<summary>暗色主题截图</summary>
+
+![MD Viewer 暗色主题](docs/screenshot-dark.png)
+
+</details>
 
 ## 功能
 
