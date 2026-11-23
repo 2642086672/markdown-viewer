@@ -1,0 +1,1718 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MD 查看器</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --bg2: #f6f8fa;
+    --fg: #1f2328;
+    --fg2: #57606a;
+    --border: #d0d7de;
+    --accent: #0969da;
+    --code-bg: #f6f8fa;
+    --sidebar-w: 280px;
+  }
+  [data-theme="dark"] {
+    --bg: #0d1117;
+    --bg2: #161b22;
+    --fg: #e6edf3;
+    --fg2: #8b949e;
+    --border: #30363d;
+    --accent: #58a6ff;
+    --code-bg: #161b22;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", sans-serif;
+    background: var(--bg);
+    color: var(--fg);
+    font-size: 15px;
+    line-height: 1.7;
+  }
+  button { font-family: inherit; cursor: pointer; }
+
+  #app { display: flex; height: 100vh; }
+
+  /* ---------- 侧边栏 ---------- */
+  #sidebar {
+    width: var(--sidebar-w);
+    min-width: var(--sidebar-w);
+    background: var(--bg2);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+  }
+  .side-head { padding: 14px; border-bottom: 1px solid var(--border); }
+  .logo { font-weight: 700; font-size: 16px; margin-bottom: 10px; }
+  .btns { display: flex; gap: 8px; margin-bottom: 10px; }
+  .btns button { flex: 1; padding: 6px 8px; font-size: 13px; }
+  .tabs { display: flex; gap: 4px; margin-bottom: 8px; }
+  .tab {
+    flex: 1; padding: 5px; font-size: 13px;
+    border: 1px solid transparent; background: transparent;
+    color: var(--fg2); border-radius: 6px; cursor: pointer;
+  }
+  .tab.active { background: var(--bg); border-color: var(--border); color: var(--fg); }
+  #searchBox {
+    width: 100%; padding: 6px 8px; font-size: 13px;
+    border: 1px solid var(--border); border-radius: 6px;
+    background: var(--bg); color: var(--fg);
+  }
+  .pane { flex: 1; overflow: auto; padding: 8px; }
+  .pane.hidden { display: none; }
+  .file-item {
+    padding: 7px 10px; border-radius: 6px; cursor: pointer;
+    font-size: 13px; color: var(--fg2);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .file-item:hover { background: var(--bg); color: var(--fg); }
+  .file-item.active { background: var(--accent); color: #fff; }
+
+  /* ---------- 主区 ---------- */
+  #main { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+  #toolbar {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 16px; border-bottom: 1px solid var(--border);
+    background: var(--bg2);
+  }
+  #menuBtn { display: none; }
+  #crumb { font-size: 13px; color: var(--fg2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #toolbar .spacer { flex: 1; }
+  #content { flex: 1; overflow: auto; padding: 36px 48px; }
+  #content > * { max-width: 920px; margin-left: auto; margin-right: auto; }
+  #statusbar {
+    padding: 4px 16px; font-size: 12px; color: var(--fg2);
+    border-top: 1px solid var(--border); background: var(--bg2);
+  }
+
+  /* ---------- 通用按钮 ---------- */
+  .btns button, #toolbar button, .wbtns button {
+    border: 1px solid var(--border); background: var(--bg2); color: var(--fg);
+    border-radius: 6px; padding: 6px 12px; font-size: 13px;
+  }
+  .btns button:hover, #toolbar button:hover, .wbtns button:hover { border-color: var(--accent); }
+
+  /* ---------- Markdown 排版 ---------- */
+  #content h1, #content h2, #content h3, #content h4, #content h5, #content h6 {
+    line-height: 1.3; margin: 1.2em 0 .6em; font-weight: 600;
+  }
+  #content h1 { font-size: 1.9em; border-bottom: 1px solid var(--border); padding-bottom: .3em; }
+  #content h2 { font-size: 1.5em; border-bottom: 1px solid var(--border); padding-bottom: .3em; }
+  #content h3 { font-size: 1.25em; }
+  #content h4 { font-size: 1.1em; }
+  #content p { margin: .8em 0; }
+  #content a { color: var(--accent); text-decoration: none; }
+  #content a:hover { text-decoration: underline; }
+  #content img { max-width: 100%; border-radius: 6px; }
+  #content blockquote {
+    margin: 1em 0; padding: 8px 16px;
+    border-left: 4px solid var(--accent);
+    background: var(--bg2); color: var(--fg2);
+    border-radius: 0 6px 6px 0;
+  }
+  #content blockquote p { margin: .4em 0; }
+  #content ul, #content ol { padding-left: 1.6em; }
+  #content li { margin: .25em 0; }
+  #content hr { border: none; border-top: 1px solid var(--border); margin: 1.6em 0; }
+  #content code {
+    font-family: "Cascadia Code", Consolas, "Courier New", monospace;
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 4px; padding: 1px 5px; font-size: .9em;
+  }
+  #content pre {
+    background: var(--code-bg); border: 1px solid var(--border);
+    border-radius: 8px; overflow: auto; margin: 0;
+  }
+  #content pre code {
+    background: none; border: none; padding: 14px 16px;
+    font-size: 13px; line-height: 1.65; display: block;
+    white-space: pre;
+  }
+  #content table { border-collapse: collapse; margin: 1em 0; max-width: 100%; }
+  #content th, #content td { border: 1px solid var(--border); padding: 6px 14px; }
+  #content th { background: var(--bg2); font-weight: 600; }
+
+  .codeblock { margin: 1em 0; }
+  .codeblock pre { border-radius: 0 0 8px 8px; }
+  .codehead {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 4px 12px; border: 1px solid var(--border); border-bottom: none;
+    border-radius: 8px 8px 0 0; background: var(--bg2);
+  }
+  .codehead .lang { font-size: 12px; color: var(--fg2); font-family: Consolas, monospace; }
+  .copybtn {
+    font-size: 12px; padding: 2px 8px;
+    border: 1px solid var(--border); background: var(--bg);
+    color: var(--fg2); border-radius: 4px; cursor: pointer;
+  }
+  .copybtn:hover { color: var(--fg); border-color: var(--accent); }
+
+  /* ---------- 复制菜单 ---------- */
+  #copyWrap { position: relative; }
+  #copyMenu {
+    position: absolute; right: 0; top: calc(100% + 6px); z-index: 50;
+    min-width: 172px; padding: 4px; display: none;
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.18);
+  }
+  #copyMenu.open { display: block; }
+  #copyMenu .scope {
+    padding: 4px 10px 6px; font-size: 11px; color: var(--fg2);
+    border-bottom: 1px solid var(--border); margin-bottom: 4px;
+    white-space: nowrap;
+  }
+  #copyMenu button {
+    display: block; width: 100%; text-align: left;
+    padding: 7px 10px; border: none; border-radius: 6px;
+    background: transparent; color: var(--fg); font-size: 13px;
+  }
+  #copyMenu button:hover { background: var(--bg2); color: var(--accent); }
+
+  .tok-kw { color: #cf222e; }
+  .tok-str { color: #0a3069; }
+  .tok-com { color: #6e7781; font-style: italic; }
+  .tok-num { color: #0550ae; }
+  [data-theme="dark"] .tok-kw { color: #ff7b72; }
+  [data-theme="dark"] .tok-str { color: #a5d6ff; }
+  [data-theme="dark"] .tok-com { color: #8b949e; }
+  [data-theme="dark"] .tok-num { color: #79c0ff; }
+
+  /* ---------- 大纲 ---------- */
+  .toc-item {
+    display: block; padding: 4px 10px; font-size: 13px;
+    color: var(--fg2); text-decoration: none; border-radius: 5px;
+    cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .toc-item:hover { background: var(--bg); color: var(--fg); }
+  .toc-l1 { padding-left: 10px; font-weight: 600; }
+  .toc-l2 { padding-left: 22px; }
+  .toc-l3 { padding-left: 34px; }
+  .toc-l4 { padding-left: 46px; }
+  .toc-l5 { padding-left: 58px; }
+  .toc-l6 { padding-left: 70px; }
+
+  /* ---------- 拖拽遮罩 ---------- */
+  #dropOverlay {
+    position: fixed; inset: 0; background: rgba(9,105,218,.12);
+    display: none; align-items: center; justify-content: center;
+    z-index: 100; pointer-events: none;
+  }
+  #dropOverlay.show { display: flex; }
+  #dropOverlay div {
+    background: var(--bg); border: 2px dashed var(--accent);
+    border-radius: 12px; padding: 32px 48px; font-size: 18px;
+  }
+
+  /* ---------- 欢迎页 ---------- */
+  .welcome { text-align: center; padding: 60px 20px; color: var(--fg2); }
+  .welcome h1 { color: var(--fg); }
+  .wbtns { display: flex; gap: 12px; justify-content: center; margin: 24px 0; }
+  .wbtns button { padding: 10px 22px; font-size: 15px; }
+  .tip { font-size: 13px; }
+  .empty { padding: 20px; text-align: center; color: var(--fg2); font-size: 13px; }
+
+  /* ---------- 移动端 ---------- */
+  @media (max-width: 760px) {
+    #menuBtn { display: inline-block; }
+    #sidebar {
+      position: fixed; left: 0; top: 0; bottom: 0; z-index: 20;
+      transform: translateX(-100%); transition: transform .2s;
+      box-shadow: 2px 0 12px rgba(0,0,0,.15);
+    }
+    #sidebar.open { transform: none; }
+    #content { padding: 20px 16px; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <aside id="sidebar">
+    <div class="side-head">
+      <div class="logo">MD 查看器</div>
+      <div class="btns">
+        <button id="openFileBtn">打开文件</button>
+        <button id="openDirBtn">打开文件夹</button>
+      </div>
+      <div class="tabs">
+        <button class="tab active" data-tab="files">文件</button>
+        <button class="tab" data-tab="toc">大纲</button>
+      </div>
+      <input id="searchBox" type="search" placeholder="搜索文件...">
+    </div>
+    <div id="fileList" class="pane"></div>
+    <div id="tocList" class="pane hidden"></div>
+  </aside>
+  <main id="main">
+    <div id="toolbar">
+      <button id="menuBtn">☰</button>
+      <div id="crumb">未打开文件</div>
+      <div class="spacer"></div>
+      <div id="copyWrap" style="display:none">
+        <button id="copyBtn" title="复制内容">复制</button>
+        <div id="copyMenu">
+          <div class="scope" id="copyScope">复制整篇文档</div>
+          <button data-copy-mode="md">复制 Markdown</button>
+          <button data-copy-mode="text">复制纯文本</button>
+        </div>
+      </div>
+      <button id="themeBtn" title="切换主题">🌙</button>
+    </div>
+    <article id="content"></article>
+    <div id="statusbar">就绪</div>
+  </main>
+</div>
+<div id="dropOverlay"><div>松开以打开文件 / 文件夹</div></div>
+<input type="file" id="fileInput" accept=".md,.markdown,.mdown,.mkd,.txt,.text" multiple hidden>
+<input type="file" id="dirInput" webkitdirectory hidden>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ================= 状态 ================= */
+  var state = {
+    files: [],          // [{file, relPath, url, text?, path?}]
+    current: null,
+    currentRelDir: '',
+    objectUrls: new Map(), // 相对路径(小写) -> blob url / data url
+    theme: localStorage.getItem('mdv-theme') || 'light',
+    mdFilePath: ''      // Electron 模式：当前文档的绝对路径
+  };
+
+  var contentEl = document.getElementById('content');
+  var fileListEl = document.getElementById('fileList');
+  var tocListEl = document.getElementById('tocList');
+  var crumbEl = document.getElementById('crumb');
+  var statusEl = document.getElementById('statusbar');
+  var searchBox = document.getElementById('searchBox');
+  var sidebar = document.getElementById('sidebar');
+  var dropOverlay = document.getElementById('dropOverlay');
+  var fileInput = document.getElementById('fileInput');
+  var dirInput = document.getElementById('dirInput');
+  var themeBtn = document.getElementById('themeBtn');
+
+  var MD_EXT = /\.(md|markdown|mdown|mkd|txt|text)$/i;
+
+  /* ================= 工具函数 ================= */
+  function escapeHtml(s, keepQuotes) {
+    var r = String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+    return keepQuotes ? r : r.replace(/"/g, '&quot;');
+  }
+
+  function normalizeRel(p) {
+    var parts = String(p).split('/');
+    var out = [];
+    for (var k = 0; k < parts.length; k++) {
+      var s = parts[k];
+      if (s === '' || s === '.') continue;
+      if (s === '..') out.pop();
+      else out.push(s);
+    }
+    return out.join('/');
+  }
+
+  function dirOf(relPath) {
+    var i = relPath.lastIndexOf('/');
+    return i >= 0 ? relPath.slice(0, i) : '';
+  }
+
+  function resolveAsset(src) {
+    if (/^(https?:|data:|file:|blob:|mailto:)/i.test(src)) return src;
+    var clean = src.split('#')[0].split('?')[0];
+    if (!clean) return src;
+    var rel = normalizeRel((state.currentRelDir ? state.currentRelDir + '/' : '') + clean);
+    var hit = state.objectUrls.get(rel.toLowerCase());
+    return hit || src;
+  }
+
+  /* ================= Markdown 渲染 ================= */
+  var KW = {
+    js: 'const let var function return if else for while do break continue new class extends super this typeof instanceof in of try catch finally throw async await yield import export from default switch case delete void static get set null undefined true false',
+    py: 'def class return if elif else for while break continue import from as pass raise try except finally with lambda yield global nonlocal assert del in is not and or None True False self',
+    c: 'int char float double long short unsigned signed void const static struct union enum typedef sizeof return if else for while do break continue switch case default goto extern volatile register auto class public private protected new delete this using namespace template typename try catch throw virtual override final null nullptr true false include define ifdef ifndef endif pragma',
+    shell: 'if then else elif fi for while do done case esac function return echo printf read cd ls pwd grep awk sed cat export local exit source alias set unset shift test',
+    json: 'true false null',
+    sql: 'select from where insert update delete create drop alter table join left right inner outer on group by order having limit offset union all as and or not null is in like between exists case when then else end primary key foreign references index view into values set',
+    html: 'html head body div span a p img script style link meta title ul ol li table tr td th form input button',
+    css: 'color background margin padding border display flex grid block inline none auto inherit important',
+    yaml: 'true false null yes no on off'
+  };
+
+  var COMMENT = {
+    js: '\\/\\/[^\\n]*|\\/\\*[\\s\\S]*?\\*\\/',
+    c: '\\/\\/[^\\n]*|\\/\\*[\\s\\S]*?\\*\\/',
+    py: '#[^\\n]*',
+    shell: '#[^\\n]*',
+    sql: '--[^\\n]*|\\/\\*[\\s\\S]*?\\*\\/',
+    css: '\\/\\*[\\s\\S]*?\\*\\/',
+    html: '<!--[\\s\\S]*?-->',
+    yaml: '#[^\\n]*',
+    json: '\\/\\/[^\\n]*'
+  };
+
+  function langKey(lang) {
+    var l = (lang || '').toLowerCase();
+    if (/^(javascript|js|typescript|ts|jsx|tsx)$/.test(l)) return 'js';
+    if (/^py/.test(l)) return 'py';
+    if (/^(c|cpp|c\+\+|java|cs|go|rust|swift|kt|scala|php|dart)$/.test(l)) return 'c';
+    if (/^(bash|sh|shell|zsh|console)$/.test(l)) return 'shell';
+    if (l === 'json') return 'json';
+    if (/^(sql|mysql|postgres)$/.test(l)) return 'sql';
+    if (/^(html|xml|vue|svg)$/.test(l)) return 'html';
+    if (/^(css|scss|less)$/.test(l)) return 'css';
+    if (/^(yaml|yml)$/.test(l)) return 'yaml';
+    return '';
+  }
+
+  function highlightCode(code, key) {
+    // keepQuotes：保留原始引号，否则字符串高亮规则匹配不到
+    var esc = escapeHtml(code, true);
+    var kw = KW[key];
+    if (!kw) return esc;
+    var com = COMMENT[key] || '';
+    var parts = [];
+    if (com) parts.push('(' + com + ')');
+    parts.push('("(?:\\\\.|[^"\\\\])*"|\'(?:\\\\.|[^\'\\\\])*\'|`(?:\\\\.|[^`\\\\])*`)');
+    parts.push('(\\b\\d+(?:\\.\\d+)?\\b)');
+    parts.push('(\\b(?:' + kw.trim().split(/\s+/).join('|') + ')\\b)');
+    var re = new RegExp(parts.join('|'), 'g');
+    return esc.replace(re, function (m, com1, str, num, keyw) {
+      if (com1) return '<span class="tok-com">' + m + '</span>';
+      if (str) return '<span class="tok-str">' + m + '</span>';
+      if (num) return '<span class="tok-num">' + m + '</span>';
+      if (keyw) return '<span class="tok-kw">' + m + '</span>';
+      return m;
+    });
+  }
+
+  function codeHtml(lang, code) {
+    var key = langKey(lang);
+    var hl = highlightCode(code, key);
+    var label = escapeHtml(lang || 'text');
+    return '<div class="codeblock">' +
+      '<div class="codehead"><span class="lang">' + label + '</span>' +
+      '<button class="copybtn" data-copy>复制</button></div>' +
+      '<pre><code>' + hl + '</code></pre></div>';
+  }
+
+  function splitRow(line) {
+    var s = line.trim();
+    if (s.charAt(0) === '|') s = s.slice(1);
+    if (s.charAt(s.length - 1) === '|') s = s.slice(0, -1);
+    return s.split('|').map(function (c) { return c.trim(); });
+  }
+
+  function tableHtml(head, aligns, rows) {
+    var th = head.map(function (c, k) {
+      return '<th style="text-align:' + (aligns[k] || '') + '">' + inline(c) + '</th>';
+    }).join('');
+    var trs = rows.map(function (r) {
+      return '<tr>' + r.map(function (c, k) {
+        return '<td style="text-align:' + (aligns[k] || '') + '">' + inline(c) + '</td>';
+      }).join('') + '</tr>';
+    }).join('');
+    return '<table><thead><tr>' + th + '</tr></thead><tbody>' + trs + '</tbody></table>';
+  }
+
+  function buildList(items, start, indent) {
+    var ordered = items[start].ordered;
+    var tag = ordered ? 'ol' : 'ul';
+    var html = '<' + tag + '>\n';
+    var i = start;
+    while (i < items.length) {
+      var it = items[i];
+      if (it.indent < indent) break;
+      if (it.indent > indent) { i++; continue; }
+      var sub = (i + 1 < items.length && items[i + 1].indent > indent)
+        ? buildList(items, i + 1, items[i + 1].indent) : null;
+      html += '<li>' + inline(it.text);
+      if (sub) {
+        html += '\n' + sub.html + '</li>\n';
+        i = sub.next;
+      } else {
+        html += '</li>\n';
+        i++;
+      }
+    }
+    html += '</' + tag + '>\n';
+    return { html: html, next: i };
+  }
+
+  function stripInline(s) {
+    return String(s)
+      .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
+      .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+      .replace(/[`*_~]/g, '')
+      .trim();
+  }
+
+  function inline(text) {
+    // 任务列表标记（仅行首）
+    text = text.replace(/^\[([ xX])\]\s+/, function (m, ch) {
+      return ch.toLowerCase() === 'x' ? '\u0001x\u0001' : '\u0001 \u0001';
+    });
+
+    // 保护行内代码，避免内部符号被解析
+    var codes = [];
+    text = text.replace(/`([^`\n]+)`/g, function (m, c) {
+      codes.push('<code>' + escapeHtml(c) + '</code>');
+      return '\u0000' + (codes.length - 1) + '\u0000';
+    });
+
+    text = escapeHtml(text);
+    // 反斜杠转义：先换成占位符保护，避免转义后的符号被当成 markdown 语法解析
+    var escapes = [];
+    text = text.replace(/\\([\\`*_{}\[\]()#+\-.!|~])/g, function (m, ch) {
+      escapes.push(ch);
+      return '\u0002' + (escapes.length - 1) + '\u0002';
+    });
+
+    // 自动链接 <https://...>
+    text = text.replace(/&lt;((?:https?|ftp):\/\/[^&\s]+)&gt;/g, function (m, u) {
+      return '<a href="' + u + '" target="_blank" rel="noopener">' + u + '</a>';
+    });
+
+    // 图片
+    text = text.replace(/!\[([^\]]*)\]\(\s*([^)\s]+)(?:\s+&quot;([^&]*)&quot;)?\s*\)/g,
+      function (m, alt, src, title) {
+        var url = resolveAsset(src);
+        return '<img src="' + url + '" alt="' + alt + '" data-md-src="' + src + '"' +
+          (title ? ' title="' + title + '"' : '') + ' loading="lazy">';
+      });
+
+    // 链接
+    text = text.replace(/\[([^\]]+)\]\(\s*([^)\s]+)(?:\s+&quot;([^&]*)&quot;)?\s*\)/g,
+      function (m, txt, href, title) {
+        var isHttp = /^(https?:|mailto:)/i.test(href);
+        var attr = isHttp ? ' target="_blank" rel="noopener"' : '';
+        var url = isHttp ? href : resolveAsset(href);
+        return '<a href="' + url + '"' + attr +
+          (title ? ' title="' + title + '"' : '') + '>' + txt + '</a>';
+      });
+
+    // 粗体 / 删除线 / 斜体
+    text = text.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    text = text.replace(/__([^_]+)__/g, '<strong>$1</strong>');
+    text = text.replace(/~~([^~]+)~~/g, '<del>$1</del>');
+    text = text.replace(/\*([^*\n]+)\*/g, '<em>$1</em>');
+    text = text.replace(/(^|[\s(])_([^_]+)_(?=[\s).,;:!?]|$)/g, '$1<em>$2</em>');
+
+    // 还原行内代码
+    text = text.replace(/\u0000(\d+)\u0000/g, function (m, n) { return codes[+n]; });
+    // 还原转义字符
+    text = text.replace(/\u0002(\d+)\u0002/g, function (m, n) { return escapes[+n]; });
+    // 还原任务列表
+    text = text.replace(/\u0001x\u0001/g, '<input type="checkbox" disabled checked> ');
+    text = text.replace(/\u0001 \u0001/g, '<input type="checkbox" disabled> ');
+    return text;
+  }
+
+  function mdToHtml(src, toc) {
+    toc = toc || [];
+    var lines = String(src).replace(/\r\n?/g, '\n').split('\n');
+    var out = [];
+    var i = 0;
+
+    while (i < lines.length) {
+      var line = lines[i];
+
+      // 1. 围栏代码块
+      var fence = line.match(/^\s{0,3}(```+|~~~+)\s*([^\s`]*)\s*$/);
+      if (fence) {
+        var marker = fence[1];
+        var lang = fence[2] || '';
+        var buf = [];
+        i++;
+        var closeRe = new RegExp('^\\s{0,3}' + marker.charAt(0) + '{' + marker.length + ',}\\s*$');
+        while (i < lines.length && !closeRe.test(lines[i])) { buf.push(lines[i]); i++; }
+        i++;
+        out.push(codeHtml(lang, buf.join('\n')));
+        continue;
+      }
+
+      // 2. 空行
+      if (/^\s*$/.test(line)) { i++; continue; }
+
+      // 3. setext 标题（=== / ---）
+      if (i + 1 < lines.length && line.trim() &&
+          !/^\s{0,3}(```|~~~|>|\||#{1,6}\s)/.test(line)) {
+        if (/^\s{0,3}=+\s*$/.test(lines[i + 1])) {
+          var id1 = 'h-' + (toc.length + 1);
+          toc.push({ level: 1, text: stripInline(line.trim()), id: id1 });
+          out.push('<h1 id="' + id1 + '">' + inline(line.trim()) + '</h1>');
+          i += 2; continue;
+        }
+        if (/^\s{0,3}-+\s*$/.test(lines[i + 1])) {
+          var id2 = 'h-' + (toc.length + 1);
+          toc.push({ level: 2, text: stripInline(line.trim()), id: id2 });
+          out.push('<h2 id="' + id2 + '">' + inline(line.trim()) + '</h2>');
+          i += 2; continue;
+        }
+      }
+
+      // 4. ATX 标题
+      var h = line.match(/^\s{0,3}(#{1,6})\s*(.*?)\s*#*\s*$/);
+      if (h) {
+        var level = h[1].length;
+        var text = h[2];
+        var id = 'h-' + (toc.length + 1);
+        toc.push({ level: level, text: stripInline(text), id: id });
+        out.push('<h' + level + ' id="' + id + '">' + inline(text) + '</h' + level + '>');
+        i++; continue;
+      }
+
+      // 5. 分割线
+      if (/^\s{0,3}((\*\s*){3,}|(-\s*){3,}|(_\s*){3,})$/.test(line)) {
+        out.push('<hr>'); i++; continue;
+      }
+
+      // 6. 引用块（递归渲染）
+      if (/^\s{0,3}>/.test(line)) {
+        var qbuf = [];
+        while (i < lines.length && /^\s{0,3}>/.test(lines[i])) {
+          qbuf.push(lines[i].replace(/^\s{0,3}>\s?/, ''));
+          i++;
+        }
+        out.push('<blockquote>' + mdToHtml(qbuf.join('\n'), toc).html + '</blockquote>');
+        continue;
+      }
+
+      // 7. 表格
+      if (line.indexOf('|') >= 0 && i + 1 < lines.length) {
+        var sep = lines[i + 1];
+        if (/^\s*\|?[\s:|-]+\|?\s*$/.test(sep) && sep.indexOf('-') >= 0 && sep.indexOf('|') >= 0) {
+          var head = splitRow(line);
+          var aligns = splitRow(sep).map(function (c) {
+            var t = c.trim();
+            if (t.charAt(0) === ':' && t.charAt(t.length - 1) === ':') return 'center';
+            if (t.charAt(t.length - 1) === ':') return 'right';
+            if (t.charAt(0) === ':') return 'left';
+            return '';
+          });
+          i += 2;
+          var rows = [];
+          while (i < lines.length && lines[i].indexOf('|') >= 0 && !/^\s*$/.test(lines[i])) {
+            rows.push(splitRow(lines[i])); i++;
+          }
+          out.push(tableHtml(head, aligns, rows));
+          continue;
+        }
+      }
+
+      // 8. 列表（含嵌套）
+      if (/^\s{0,3}([-*+]|\d+\.)\s+/.test(line)) {
+        var items = [];
+        var base = null;
+        while (i < lines.length) {
+          var l = lines[i];
+          if (/^\s*$/.test(l)) {
+            if (i + 1 < lines.length && /^\s{0,3}([-*+]|\d+\.)\s+/.test(lines[i + 1])) { i++; continue; }
+            break;
+          }
+          var m = l.match(/^(\s*)([-*+]|\d+\.)\s+(.*)$/);
+          if (m) {
+            var indent = m[1].replace(/\t/g, '    ').length;
+            if (base === null) base = indent;
+            if (indent < base) break;
+            items.push({ indent: indent, ordered: /^\d/.test(m[2]), text: m[3] });
+            i++;
+          } else if (items.length && /^\s+\S/.test(l) && !/^\s{0,3}([-*+]|\d+\.)\s+/.test(l)) {
+            items[items.length - 1].text += ' ' + l.trim();
+            i++;
+          } else break;
+        }
+        if (items.length) out.push(buildList(items, 0, items[0].indent).html);
+        continue;
+      }
+
+      // 9. 原生 HTML 块
+      if (/^\s{0,3}<[a-zA-Z!/]/.test(line)) {
+        var hbuf = [];
+        while (i < lines.length && !/^\s*$/.test(lines[i])) { hbuf.push(lines[i]); i++; }
+        out.push(hbuf.join('\n'));
+        continue;
+      }
+
+      // 10. 段落
+      var pbuf = [];
+      while (i < lines.length && !/^\s*$/.test(lines[i]) &&
+             !/^\s{0,3}(```|~~~|>|#{1,6}\s|([-*+]|\d+\.)\s+|\||<[a-zA-Z!/])/.test(lines[i]) &&
+             !/^\s{0,3}((\*\s*){3,}|(-\s*){3,}|(_\s*){3,})$/.test(lines[i])) {
+        pbuf.push(lines[i]); i++;
+      }
+      if (pbuf.length) {
+        out.push('<p>' + pbuf.map(function (l) { return inline(l.trim()); }).join('<br>') + '</p>');
+      } else {
+        i++;
+      }
+    }
+
+    return { html: out.join('\n'), toc: toc };
+  }
+
+  /* ================= 文件加载 ================= */
+  function loadFiles(list) {
+    for (var k = 0; k < list.length; k++) {
+      var item = list[k];
+      if (MD_EXT.test(item.file.name)) {
+        var url = URL.createObjectURL(item.file);
+        var exist = -1;
+        for (var j = 0; j < state.files.length; j++) {
+          if (state.files[j].relPath.toLowerCase() === item.relPath.toLowerCase()) { exist = j; break; }
+        }
+        if (exist >= 0) {
+          URL.revokeObjectURL(state.files[exist].url);
+          state.files[exist] = { file: item.file, relPath: item.relPath, url: url };
+        } else {
+          state.files.push({ file: item.file, relPath: item.relPath, url: url });
+        }
+      } else {
+        state.objectUrls.set(item.relPath.toLowerCase(), URL.createObjectURL(item.file));
+      }
+    }
+    renderFileList();
+    if (!state.current || state.files.indexOf(state.current) < 0) {
+      if (state.files.length) showFile(state.files[0]);
+    }
+  }
+
+  /* ================= Electron 桥接 ================= */
+  function electronAvailable() {
+    return !!(window.electronAPI && window.electronAPI.readFile);
+  }
+
+  function normalizePath(p) {
+    return String(p).replace(/\\/g, '/');
+  }
+
+  function resolveAbsPath(filePath, rel) {
+    var dir = dirOf(normalizePath(filePath));
+    return normalizeRel(dir + '/' + rel);
+  }
+
+  // 预读当前文档引用的所有本地图片为 data URL
+  function preloadAssets(filePath, text) {
+    var dir = dirOf(normalizePath(filePath));
+    var map = new Map();
+    var re = /!\[[^\]]*\]\(([^)\s)]+)\)/g;
+    var jobs = [];
+    var m;
+    while ((m = re.exec(text))) {
+      var src = m[1].split('#')[0].split('?')[0];
+      if (!src || /^(https?:|data:|file:|blob:)/i.test(src)) continue;
+      var rel = normalizeRel(dir + '/' + src);
+      jobs.push(window.electronAPI.readImage(rel).then(function (r) {
+        if (r && r.ok) map.set(rel.toLowerCase(), r.dataUrl);
+      }));
+    }
+    return Promise.all(jobs).then(function () { return map; });
+  }
+
+  function renderText(text, displayName, currentObj) {
+    state.current = currentObj || { name: displayName, relPath: displayName, text: text };
+    var res = mdToHtml(text, []);
+    contentEl.innerHTML = res.html;
+    renderToc(res.toc);
+    renderFileList();
+    crumbEl.textContent = displayName;
+    statusEl.textContent = displayName + ' · ' + text.length + ' 字符 · ' +
+      text.split('\n').length + ' 行';
+    document.title = displayName + ' - MD 查看器';
+    contentEl.scrollTop = 0;
+    sidebar.classList.remove('open');
+    copyWrap.style.display = '';
+    copyMenu.classList.remove('open');
+  }
+
+  function addToFiles(displayName, text) {
+    var exist = -1;
+    for (var k = 0; k < state.files.length; k++) {
+      if (state.files[k].relPath === displayName) { exist = k; break; }
+    }
+    var item;
+    if (exist < 0) {
+      item = { name: displayName, relPath: displayName, text: text };
+      state.files.push(item);
+    } else {
+      item = state.files[exist];
+      item.text = text;
+    }
+    return item;
+  }
+
+  function openFileByPath(p) {
+    if (!electronAvailable()) return;
+    window.electronAPI.readFile(p).then(function (r) {
+      if (!r.ok) {
+        alert('读取失败: ' + r.error);
+        return;
+      }
+      state.mdFilePath = p;
+      state.currentRelDir = dirOf(normalizePath(p));
+      preloadAssets(p, r.text).then(function (map) {
+        state.objectUrls = map;
+        var item = addToFiles(p, r.text);
+        renderText(r.text, p, item);
+        renderFileList();
+      });
+    });
+  }
+
+  function openDirectoryByPath(dir) {
+    if (!electronAvailable()) return;
+    var all = [];
+    function walk(d, prefix) {
+      return window.electronAPI.listDirectory(d).then(function (res) {
+        if (!res.ok) return;
+        res.files.forEach(function (f) {
+          all.push({ name: f.name, path: f.path, rel: prefix ? prefix + '/' + f.name : f.name });
+        });
+        var sub = Promise.resolve();
+        res.dirs.forEach(function (sd) {
+          sub = sub.then(function () {
+            return walk(sd.path, prefix ? prefix + '/' + sd.name : sd.name);
+          });
+        });
+        return sub;
+      });
+    }
+    walk(dir, '').then(function () {
+      var reads = [];
+      all.forEach(function (f) {
+        if (MD_EXT.test(f.name)) {
+          reads.push(window.electronAPI.readFile(f.path).then(function (r) {
+            if (r.ok) {
+              state.files.push({ name: f.name, relPath: f.rel, text: r.text, path: f.path });
+            }
+          }));
+        } else {
+          reads.push(window.electronAPI.readImage(f.path).then(function (r) {
+            if (r.ok) state.objectUrls.set(f.rel.toLowerCase(), r.dataUrl);
+          }));
+        }
+      });
+      Promise.all(reads).then(function () {
+        renderFileList();
+        if (state.files.length) showFile(state.files[state.files.length - 1]);
+      });
+    });
+  }
+
+  function showFile(f) {
+    if (f.text !== undefined) {
+      state.currentRelDir = f.path ? dirOf(normalizePath(f.path)) : dirOf(f.relPath);
+      renderText(f.text, f.relPath, f);
+      return;
+    }
+    f.file.text().then(function (text) {
+      f.text = text;
+      state.currentRelDir = dirOf(f.relPath);
+      renderText(text, f.relPath, f);
+    }).catch(function (err) {
+      contentEl.innerHTML = '<div class="welcome"><h1>读取失败</h1><p>' +
+        escapeHtml(String(err)) + '</p></div>';
+    });
+  }
+
+  /* ================= 侧边栏 ================= */
+  function renderFileList() {
+    var q = searchBox.value.trim().toLowerCase();
+    var items = state.files.filter(function (f) {
+      return f.relPath.toLowerCase().indexOf(q) >= 0;
+    });
+    if (!items.length) {
+      fileListEl.innerHTML = '<div class="empty">暂无文件</div>';
+      return;
+    }
+    fileListEl.innerHTML = items.map(function (f) {
+      var idx = state.files.indexOf(f);
+      var cls = f === state.current ? 'file-item active' : 'file-item';
+      return '<div class="' + cls + '" data-idx="' + idx + '">' +
+        escapeHtml(f.relPath) + '</div>';
+    }).join('');
+  }
+
+  function renderToc(toc) {
+    if (!toc.length) {
+      tocListEl.innerHTML = '<div class="empty">无标题</div>';
+      return;
+    }
+    tocListEl.innerHTML = toc.map(function (t) {
+      return '<a class="toc-item toc-l' + t.level + '" data-id="' + t.id + '">' +
+        escapeHtml(t.text) + '</a>';
+    }).join('');
+  }
+
+  /* ================= 交互 ================= */
+  document.getElementById('openFileBtn').addEventListener('click', function () {
+    if (electronAvailable()) {
+      window.electronAPI.pickFile().then(function (p) {
+        if (p) openFileByPath(p);
+      });
+    } else {
+      fileInput.click();
+    }
+  });
+  document.getElementById('openDirBtn').addEventListener('click', function () {
+    if (electronAvailable()) {
+      window.electronAPI.pickDirectory().then(function (d) {
+        if (d) openDirectoryByPath(d);
+      });
+    } else {
+      dirInput.click();
+    }
+  });
+
+  fileInput.addEventListener('change', function () {
+    var list = Array.prototype.map.call(fileInput.files, function (f) {
+      return { file: f, relPath: f.name };
+    });
+    fileInput.value = '';
+    if (list.length) loadFiles(list);
+  });
+
+  dirInput.addEventListener('change', function () {
+    var list = Array.prototype.map.call(dirInput.files, function (f) {
+      return { file: f, relPath: f.webkitRelativePath || f.name };
+    });
+    dirInput.value = '';
+    if (list.length) loadFiles(list);
+  });
+
+  fileListEl.addEventListener('click', function (e) {
+    var item = e.target.closest('.file-item');
+    if (!item) return;
+    var f = state.files[+item.dataset.idx];
+    if (f) showFile(f);
+  });
+
+  tocListEl.addEventListener('click', function (e) {
+    var a = e.target.closest('.toc-item');
+    if (!a) return;
+    var el = document.getElementById(a.dataset.id);
+    if (el) {
+      e.preventDefault();
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  });
+
+  searchBox.addEventListener('input', renderFileList);
+
+  document.querySelectorAll('.tab').forEach(function (tab) {
+    tab.addEventListener('click', function () {
+      document.querySelectorAll('.tab').forEach(function (t) { t.classList.remove('active'); });
+      tab.classList.add('active');
+      var which = tab.dataset.tab;
+      fileListEl.classList.toggle('hidden', which !== 'files');
+      tocListEl.classList.toggle('hidden', which !== 'toc');
+    });
+  });
+
+  document.getElementById('menuBtn').addEventListener('click', function () {
+    sidebar.classList.toggle('open');
+  });
+
+  if (window.matchMedia('(max-width: 760px)').matches) {
+    contentEl.addEventListener('click', function () {
+      sidebar.classList.remove('open');
+    });
+  }
+
+  themeBtn.addEventListener('click', function () {
+    setTheme(state.theme === 'dark' ? 'light' : 'dark');
+  });
+
+  function setTheme(t) {
+    state.theme = t;
+    document.documentElement.setAttribute('data-theme', t);
+    localStorage.setItem('mdv-theme', t);
+    themeBtn.textContent = t === 'dark' ? '☀️' : '🌙';
+  }
+
+  contentEl.addEventListener('click', function (e) {
+    // 复制代码
+    var btn = e.target.closest('[data-copy]');
+    if (btn) {
+      var code = btn.closest('.codeblock').querySelector('code').textContent;
+      copyText(code, btn);
+      return;
+    }
+    // 链接跳转（相对 .md 链接在文件夹模式下直接打开）
+    var a = e.target.closest('a');
+    if (!a) return;
+    var href = a.getAttribute('href') || '';
+    if (/^(https?:|mailto:)/i.test(href)) {
+      a.target = '_blank';
+      a.rel = 'noopener';
+      return;
+    }
+    var rel = normalizeRel((state.currentRelDir ? state.currentRelDir + '/' : '') + href);
+    var target = null;
+    for (var k = 0; k < state.files.length; k++) {
+      if (state.files[k].relPath.toLowerCase() === rel.toLowerCase()) { target = state.files[k]; break; }
+    }
+    if (target) {
+      e.preventDefault();
+      showFile(target);
+      return;
+    }
+    // Electron：相对 .md 链接直接打开磁盘文件
+    if (electronAvailable() && state.mdFilePath && /\.md$/i.test(href)) {
+      e.preventDefault();
+      openFileByPath(resolveAbsPath(state.mdFilePath, href));
+    }
+  });
+
+  function writeClipboard(text, onOk) {
+    function fallback() {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      var ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) { /* 忽略 */ }
+      document.body.removeChild(ta);
+      if (ok && onOk) onOk();
+    }
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(function () {
+        if (onOk) onOk();
+      }).catch(fallback);
+    } else {
+      fallback();
+    }
+  }
+
+  function copyText(text, btn) {
+    writeClipboard(text, function () {
+      btn.textContent = '已复制';
+      setTimeout(function () { btn.textContent = '复制'; }, 1500);
+    });
+  }
+
+  /* ================= 复制内容（Markdown / 纯文本） ================= */
+
+  var BLOCK_TAGS = /^(address|article|aside|blockquote|div|dl|dt|dd|fieldset|figcaption|figure|footer|form|h[1-6]|header|hgroup|hr|li|main|nav|ol|p|pre|section|table|ul)$/i;
+
+  function isBlockTag(tag) { return BLOCK_TAGS.test(tag); }
+
+  function mdInlineChildren(el) {
+    var s = '';
+    for (var n = el.firstChild; n; n = n.nextSibling) s += mdInlineNode(n);
+    return s;
+  }
+
+  function mdInlineNode(n) {
+    if (n.nodeType === 3) return n.nodeValue.replace(/\s+/g, ' ');
+    if (n.nodeType !== 1) return '';
+    var tag = n.tagName.toLowerCase();
+    if (tag === 'br') return '\n';
+    if (tag === 'img') {
+      var imgSrc = n.getAttribute('data-md-src') || n.getAttribute('src') || '';
+      return '![' + (n.getAttribute('alt') || '') + '](' + imgSrc + ')';
+    }
+    if (tag === 'input' && n.type === 'checkbox') return n.checked ? '[x] ' : '[ ] ';
+    if (tag === 'button') return '';
+    if (n.classList && (n.classList.contains('copybtn') || n.classList.contains('codehead'))) return '';
+    if (tag === 'code') return '`' + n.textContent + '`';
+    if (tag === 'a') {
+      var href = n.getAttribute('href') || '';
+      var atext = mdInlineChildren(n).trim();
+      if (!href || /^javascript:/i.test(href)) return atext;
+      return '[' + atext + '](' + href + ')';
+    }
+    if (tag === 'strong' || tag === 'b') {
+      var st = mdInlineChildren(n).trim();
+      return st ? '**' + st + '**' : '';
+    }
+    if (tag === 'em' || tag === 'i') {
+      var em = mdInlineChildren(n).trim();
+      return em ? '*' + em + '*' : '';
+    }
+    if (tag === 'del' || tag === 's' || tag === 'strike') {
+      var dl = mdInlineChildren(n).trim();
+      return dl ? '~~' + dl + '~~' : '';
+    }
+    if (isBlockTag(tag)) return mdBlockNode(n);
+    return mdInlineChildren(n);
+  }
+
+  function mdChildren(el) {
+    var s = '';
+    for (var n = el.firstChild; n; n = n.nextSibling) {
+      if (n.nodeType === 3) s += mdInlineNode(n);
+      else if (n.nodeType === 1) s += isBlockTag(n.tagName.toLowerCase()) ? mdBlockNode(n) : mdInlineNode(n);
+    }
+    return s;
+  }
+
+  function codeLang(preEl) {
+    var lang = '';
+    var block = preEl.closest ? preEl.closest('.codeblock') : null;
+    if (block) {
+      var langEl = block.querySelector('.codehead .lang');
+      if (langEl) {
+        lang = langEl.textContent.trim();
+        if (/^text$/i.test(lang)) lang = '';
+      }
+    }
+    return lang;
+  }
+
+  function mdBlockNode(n) {
+    if (n.nodeType === 3) return n.nodeValue.replace(/\s+/g, ' ');
+    if (n.nodeType !== 1) return '';
+    var tag = n.tagName.toLowerCase();
+    var cls = n.classList || { contains: function () { return false; } };
+    if (cls.contains('copybtn') || cls.contains('codehead')) return '';
+
+    if (/^h[1-6]$/.test(tag)) {
+      return '\n\n' + new Array(+tag.charAt(1) + 1).join('#') + ' ' +
+        mdInlineChildren(n).trim() + '\n\n';
+    }
+    if (tag === 'p') {
+      var p = mdInlineChildren(n).trim();
+      return p ? '\n\n' + p + '\n\n' : '';
+    }
+    if (tag === 'hr') return '\n\n---\n\n';
+    if (tag === 'pre') {
+      var codeEl = n.querySelector('code');
+      var code = codeEl ? codeEl.textContent : n.textContent;
+      var lang = codeLang(n);
+      var fence = '```';
+      while (code.indexOf(fence) >= 0) fence += '`';
+      return '\n\n' + fence + lang + '\n' + code.replace(/\n+$/, '') + '\n' + fence + '\n\n';
+    }
+    if (tag === 'blockquote') {
+      var inner = mdChildren(n).trim();
+      if (!inner) return '';
+      return '\n\n' + inner.split('\n').map(function (l) {
+        return l ? '> ' + l : '>';
+      }).join('\n') + '\n\n';
+    }
+    if (tag === 'ul' || tag === 'ol') return '\n\n' + mdList(n, '') + '\n\n';
+    if (tag === 'table') {
+      var tbl = mdTable(n);
+      return tbl ? '\n\n' + tbl + '\n\n' : '';
+    }
+    if (tag === 'div' && cls.contains('codeblock')) {
+      var preEl = n.querySelector('pre');
+      return preEl ? mdBlockNode(preEl) : mdChildren(n);
+    }
+    return mdChildren(n);
+  }
+
+  function mdList(listEl, indent) {
+    var ordered = listEl.tagName.toLowerCase() === 'ol';
+    var num = parseInt(listEl.getAttribute('start') || '1', 10);
+    if (!num || num < 1) num = 1;
+    var lines = [];
+    var idx = 0;
+    for (var li = listEl.firstElementChild; li; li = li.nextElementSibling) {
+      if (li.tagName.toLowerCase() !== 'li') continue;
+      var text = '';
+      var sub = '';
+      for (var c = li.firstChild; c; c = c.nextSibling) {
+        if (c.nodeType === 1 && /^(ul|ol)$/i.test(c.tagName)) {
+          sub += mdList(c, indent + '  ');
+        } else if (c.nodeType === 3) {
+          text += mdInlineNode(c);
+        } else if (c.nodeType === 1) {
+          text += isBlockTag(c.tagName.toLowerCase()) ? mdBlockNode(c) : mdInlineNode(c);
+        }
+      }
+      var marker = ordered ? (num + idx) + '. ' : '- ';
+      lines.push(indent + marker + text.replace(/\s+/g, ' ').trim());
+      idx++;
+      if (sub) lines.push(sub.replace(/\n+$/, ''));
+    }
+    return lines.join('\n') + '\n';
+  }
+
+  function mdTable(tbl) {
+    var rows = [];
+    var aligns = [];
+    var trs = tbl.querySelectorAll('tr');
+    for (var r = 0; r < trs.length; r++) {
+      var cells = [];
+      var chs = trs[r].children;
+      for (var c = 0; c < chs.length; c++) {
+        var cell = chs[c];
+        var t = cell.tagName.toLowerCase();
+        if (t !== 'td' && t !== 'th') continue;
+        cells.push(mdInlineChildren(cell).replace(/\s+/g, ' ').trim().replace(/\|/g, '\\|'));
+        if (r === 0) {
+          var al = String(cell.style.textAlign || '').toLowerCase();
+          aligns.push(al === 'center' || al === 'right' || al === 'left' ? al : '');
+        }
+      }
+      if (cells.length) rows.push(cells);
+    }
+    if (!rows.length) return '';
+    var sep = [];
+    for (var k = 0; k < rows[0].length; k++) {
+      var a = aligns[k] || '';
+      sep.push(a === 'center' ? ':---:' : a === 'right' ? '---:' : a === 'left' ? ':---' : '---');
+    }
+    var out = ['| ' + rows[0].join(' | ') + ' |', '| ' + sep.join(' | ') + ' |'];
+    for (var i = 1; i < rows.length; i++) out.push('| ' + rows[i].join(' | ') + ' |');
+    return out.join('\n');
+  }
+
+  function tidyMarkdown(s) {
+    var parts = String(s).split(/(```[\s\S]*?```)/g);
+    for (var i = 0; i < parts.length; i += 2) {
+      parts[i] = parts[i]
+        .replace(/[ \t]+\n/g, '\n')
+        .replace(/^[ \t]+$/gm, '')
+        .replace(/\n{3,}/g, '\n\n');
+    }
+    return parts.join('').trim() + '\n';
+  }
+
+  function plainTextOfNode(n) {
+    if (n.nodeType === 3) {
+      var tv = n.nodeValue || '';
+      if (/^\s*$/.test(tv) && n.parentNode &&
+          /^(article|div|blockquote|section|ul|ol|table|thead|tbody|tr)$/i.test(n.parentNode.tagName)) return '';
+      return tv;
+    }
+    if (n.nodeType !== 1) return '';
+    var tag = n.tagName.toLowerCase();
+    var cls = n.classList;
+    if (tag === 'button' || (cls && cls.contains('codehead'))) return '';
+    if (tag === 'br') return '\n';
+    if (tag === 'hr') return '\n\n--------\n\n';
+    if (tag === 'img') return n.getAttribute('alt') || '';
+    if (tag === 'ul' || tag === 'ol') return '\n\n' + plainTextList(n, '') + '\n\n';
+    if (tag === 'div' && cls && cls.contains('codeblock')) {
+      var preEl = n.querySelector('pre');
+      return preEl ? plainTextOfNode(preEl) : plainTextChildren(n);
+    }
+    if (tag === 'tr') {
+      var cells = [];
+      for (var c = n.firstElementChild; c; c = c.nextElementSibling) {
+        if (/^(td|th)$/i.test(c.tagName)) cells.push(plainTextChildren(c).trim());
+      }
+      return cells.join('\t') + '\n';
+    }
+    if (tag === 'thead' || tag === 'tbody' || tag === 'table' ||
+        /^h[1-6]$/.test(tag) || tag === 'p' || tag === 'pre' ||
+        tag === 'blockquote' || tag === 'div' || tag === 'section' || tag === 'article') {
+      return '\n\n' + plainTextChildren(n) + '\n\n';
+    }
+    return plainTextChildren(n);
+  }
+
+  function plainTextChildren(el) {
+    var s = '';
+    for (var n = el.firstChild; n; n = n.nextSibling) s += plainTextOfNode(n);
+    return s;
+  }
+
+  function plainTextList(listEl, indent) {
+    var ordered = listEl.tagName.toLowerCase() === 'ol';
+    var num = parseInt(listEl.getAttribute('start') || '1', 10) || 1;
+    var out = [];
+    var idx = 0;
+    for (var li = listEl.firstElementChild; li; li = li.nextElementSibling) {
+      if (li.tagName.toLowerCase() !== 'li') continue;
+      var text = '';
+      var sub = '';
+      for (var c = li.firstChild; c; c = c.nextSibling) {
+        if (c.nodeType === 1 && /^(ul|ol)$/i.test(c.tagName)) sub += plainTextList(c, indent + '    ');
+        else text += plainTextOfNode(c);
+      }
+      out.push(indent + (ordered ? (num + idx) + '. ' : '• ') +
+        text.replace(/[\t ]*\n[\t ]*/g, ' ').trim());
+      idx++;
+      if (sub) out.push(sub.replace(/\n+$/, ''));
+    }
+    return out.join('\n') + '\n';
+  }
+
+  function tidyPlainText(s) {
+    return String(s)
+      .replace(/[ \t]+\n/g, '\n')
+      .replace(/^[ \t]+$/gm, '')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+  }
+
+  var copyWrap = document.getElementById('copyWrap');
+  var copyBtn = document.getElementById('copyBtn');
+  var copyMenu = document.getElementById('copyMenu');
+  var copyScope = document.getElementById('copyScope');
+
+  function contentSelection() {
+    var sel = window.getSelection();
+    if (!sel || !sel.rangeCount || sel.isCollapsed) return null;
+    if (!contentEl.contains(sel.getRangeAt(0).commonAncestorContainer)) return null;
+    return sel;
+  }
+
+  function selectionToMarkdown(sel) {
+    var range = sel.getRangeAt(0);
+    var root = range.commonAncestorContainer;
+    if (root.nodeType === 3) return tidyMarkdown(mdPartialText(range, root));
+    if (root === contentEl) return tidyMarkdown(mdRangeChildren(root, range));
+    return tidyMarkdown(mdPartialElement(root, range));
+  }
+
+  function selectionToPlainText(sel) {
+    var range = sel.getRangeAt(0);
+    var root = range.commonAncestorContainer;
+    if (root.nodeType === 3) return tidyPlainText(rangeTextSlice(range, root));
+    if (root === contentEl) return tidyPlainText(plainRangeChildren(root, range));
+    return tidyPlainText(plainPartialElement(root, range));
+  }
+
+  function contentPlainText() {
+    return tidyPlainText(plainTextChildren(contentEl));
+  }
+
+  /* ---- 按选区序列化（保留块级结构，处理部分选中的块） ---- */
+
+  function rangeTextSlice(range, tn) {
+    var v = tn.nodeValue || '';
+    var start = 0;
+    var end = v.length;
+    if (tn === range.startContainer) start = range.startOffset;
+    if (tn === range.endContainer) end = range.endOffset;
+    return v.slice(start, end);
+  }
+
+  function mdPartialText(range, tn) {
+    return rangeTextSlice(range, tn).replace(/\s+/g, ' ');
+  }
+
+  function rangeContainsNode(range, node) {
+    var r = document.createRange();
+    r.selectNode(node);
+    return range.compareBoundaryPoints(Range.START_TO_START, r) <= 0 &&
+           range.compareBoundaryPoints(Range.END_TO_END, r) >= 0;
+  }
+
+  function indentLines(s, pad) {
+    return String(s).replace(/\n+$/, '').split('\n').map(function (l) {
+      return l ? pad + l : l;
+    }).join('\n');
+  }
+
+  function mdRangeChildren(el, range) {
+    var s = '';
+    for (var n = el.firstChild; n; n = n.nextSibling) s += mdRangeNode(n, range);
+    return s;
+  }
+
+  function mdRangeNode(n, range) {
+    if (!range.intersectsNode(n)) return '';
+    if (n.nodeType === 3) return mdPartialText(range, n);
+    if (n.nodeType !== 1) return '';
+    if (rangeContainsNode(range, n)) {
+      return isBlockTag(n.tagName.toLowerCase()) ? mdBlockNode(n) : mdInlineNode(n);
+    }
+    return mdPartialElement(n, range);
+  }
+
+  function mdPartialElement(n, range) {
+    var tag = n.tagName.toLowerCase();
+    var cls = n.classList || { contains: function () { return false; } };
+    if (tag === 'button' || cls.contains('copybtn') || cls.contains('codehead')) return '';
+    var inner = function () { return mdRangeChildren(n, range); };
+
+    if (/^h[1-6]$/.test(tag)) {
+      var ht = inner().trim();
+      return ht ? '\n\n' + new Array(+tag.charAt(1) + 1).join('#') + ' ' + ht + '\n\n' : '';
+    }
+    if (tag === 'p') {
+      var pt = inner().trim();
+      return pt ? '\n\n' + pt + '\n\n' : '';
+    }
+    if (tag === 'pre') {
+      var code = plainTextOfRange(n, range).replace(/\n+$/, '');
+      if (!code) return '';
+      var fence = '```';
+      while (code.indexOf(fence) >= 0) fence += '`';
+      return '\n\n' + fence + codeLang(n) + '\n' + code + '\n' + fence + '\n\n';
+    }
+    if (tag === 'blockquote') {
+      var qt = inner().trim();
+      if (!qt) return '';
+      return '\n\n' + qt.split('\n').map(function (l) {
+        return l ? '> ' + l : '>';
+      }).join('\n') + '\n\n';
+    }
+    if (tag === 'ul' || tag === 'ol') return '\n\n' + mdListRange(n, range) + '\n\n';
+    if (tag === 'tr' || tag === 'thead' || tag === 'tbody') {
+      var rowTable = n.closest ? n.closest('table') : null;
+      var rowMd = rowTable ? mdTableRange(rowTable, range) : '';
+      return rowMd ? '\n\n' + rowMd + '\n\n' : inner();
+    }
+    if (tag === 'table') {
+      var tbl = mdTableRange(n, range);
+      return tbl ? '\n\n' + tbl + '\n\n' : '';
+    }
+    if (tag === 'strong' || tag === 'b') {
+      var bt = inner().trim();
+      return bt ? '**' + bt + '**' : '';
+    }
+    if (tag === 'em' || tag === 'i') {
+      var it = inner().trim();
+      return it ? '*' + it + '*' : '';
+    }
+    if (tag === 'del' || tag === 's' || tag === 'strike') {
+      var dt = inner().trim();
+      return dt ? '~~' + dt + '~~' : '';
+    }
+    if (tag === 'code') {
+      var ct = plainTextOfRange(n, range).replace(/\s+/g, ' ');
+      return ct ? '`' + ct + '`' : '';
+    }
+    if (tag === 'a') {
+      var at = inner().trim();
+      var href = n.getAttribute('href') || '';
+      if (!at) return '';
+      if (!href || /^javascript:/i.test(href)) return at;
+      return '[' + at + '](' + href + ')';
+    }
+    if (tag === 'li') {
+      var list = n.parentNode;
+      if (list && /^(ul|ol)$/i.test(list.tagName)) {
+        var nested = list.parentNode && /^(ul|ol)$/i.test(list.parentNode.tagName);
+        return '\n\n' + indentLines(mdListRange(list, range), nested ? '  ' : '') + '\n\n';
+      }
+    }
+    return inner();
+  }
+
+  function plainTextOfRange(el, range) {
+    var s = '';
+    for (var n = el.firstChild; n; n = n.nextSibling) {
+      if (!range.intersectsNode(n)) continue;
+      if (n.nodeType === 3) s += rangeTextSlice(range, n);
+      else if (n.nodeType === 1) s += plainTextOfRange(n, range);
+    }
+    return s;
+  }
+
+  function mdListRange(listEl, range) {
+    var ordered = listEl.tagName.toLowerCase() === 'ol';
+    var num = parseInt(listEl.getAttribute('start') || '1', 10) || 1;
+    var lines = [];
+    var idx = 0;
+    for (var k = 0; k < listEl.children.length; k++) {
+      var li = listEl.children[k];
+      if (li.tagName.toLowerCase() !== 'li') continue;
+      var liNo = idx;
+      idx++;
+      if (!range.intersectsNode(li)) continue;
+      var text = '';
+      var sub = '';
+      for (var c = li.firstChild; c; c = c.nextSibling) {
+        if (!range.intersectsNode(c)) continue;
+        if (c.nodeType === 1 && /^(ul|ol)$/i.test(c.tagName)) {
+          sub += rangeContainsNode(range, c)
+            ? indentLines(mdList(c, ''), '  ')
+            : indentLines(mdListRange(c, range), '  ');
+        } else if (c.nodeType === 3) {
+          text += mdPartialText(range, c);
+        } else if (c.nodeType === 1) {
+          text += rangeContainsNode(range, c)
+            ? (isBlockTag(c.tagName.toLowerCase()) ? mdBlockNode(c) : mdInlineNode(c))
+            : mdPartialElement(c, range);
+        }
+      }
+      lines.push((ordered ? (num + liNo) + '. ' : '- ') + text.replace(/\s+/g, ' ').trim());
+      if (sub) lines.push(sub);
+    }
+    return lines.join('\n') + '\n';
+  }
+
+  function mdTableRange(tbl, range) {
+    var trs = tbl.querySelectorAll('tr');
+    if (!trs.length) return '';
+    var thead = tbl.querySelector('thead');
+    var headCount = thead ? thead.querySelectorAll('tr').length : 1;
+    var headRow = trs[0];
+    var bodyRows = [];
+    for (var r = 0; r < trs.length; r++) {
+      if (r >= headCount && range.intersectsNode(trs[r])) bodyRows.push(trs[r]);
+    }
+
+    function cellText(cell, force) {
+      if (force || rangeContainsNode(range, cell)) {
+        return mdInlineChildren(cell).replace(/\s+/g, ' ').trim().replace(/\|/g, '\\|');
+      }
+      if (range.intersectsNode(cell)) {
+        return plainTextOfRange(cell, range).replace(/\s+/g, ' ').trim().replace(/\|/g, '\\|');
+      }
+      return '';
+    }
+
+    var heads = [];
+    var aligns = [];
+    for (var hc = 0; hc < headRow.children.length; hc++) {
+      var hcell = headRow.children[hc];
+      if (!/^(td|th)$/i.test(hcell.tagName)) continue;
+      heads.push(cellText(hcell, true));
+      var al = String(hcell.style.textAlign || '').toLowerCase();
+      aligns.push(al === 'center' || al === 'right' || al === 'left' ? al : '');
+    }
+    if (!heads.length) return '';
+    var sep = aligns.map(function (a) {
+      return a === 'center' ? ':---:' : a === 'right' ? '---:' : a === 'left' ? ':---' : '---';
+    });
+    var out = ['| ' + heads.join(' | ') + ' |', '| ' + sep.join(' | ') + ' |'];
+    for (var br = 0; br < bodyRows.length; br++) {
+      var cells = [];
+      for (var c2 = 0; c2 < bodyRows[br].children.length; c2++) {
+        var cell2 = bodyRows[br].children[c2];
+        if (/^(td|th)$/i.test(cell2.tagName)) cells.push(cellText(cell2, false));
+      }
+      out.push('| ' + cells.join(' | ') + ' |');
+    }
+    return out.join('\n');
+  }
+
+  function plainRangeChildren(el, range) {
+    var s = '';
+    for (var n = el.firstChild; n; n = n.nextSibling) s += plainRangeNode(n, range);
+    return s;
+  }
+
+  function plainRangeNode(n, range) {
+    if (!range.intersectsNode(n)) return '';
+    if (n.nodeType === 3) {
+      var tv = rangeTextSlice(range, n);
+      if (/^\s*$/.test(tv) && n.parentNode &&
+          /^(article|div|blockquote|section|ul|ol|table|thead|tbody|tr)$/i.test(n.parentNode.tagName)) return '';
+      return tv;
+    }
+    if (n.nodeType !== 1) return '';
+    if (rangeContainsNode(range, n)) return plainTextOfNode(n);
+    return plainPartialElement(n, range);
+  }
+
+  function plainPartialElement(n, range) {
+    var tag = n.tagName.toLowerCase();
+    var cls = n.classList;
+    if (tag === 'button' || (cls && cls.contains('codehead'))) return '';
+    if (tag === 'br') return '\n';
+    if (tag === 'hr') return '\n\n--------\n\n';
+    if (tag === 'img') return n.getAttribute('alt') || '';
+    if (tag === 'ul' || tag === 'ol') return '\n\n' + plainTextListRange(n, range) + '\n\n';
+    if (tag === 'tr') {
+      var cells = [];
+      for (var c = n.firstElementChild; c; c = c.nextElementSibling) {
+        if (!/^(td|th)$/i.test(c.tagName) || !range.intersectsNode(c)) continue;
+        cells.push(plainRangeChildren(c, range).trim());
+      }
+      return cells.join('\t') + '\n';
+    }
+    if (tag === 'li') {
+      var list = n.parentNode;
+      if (list && /^(ul|ol)$/i.test(list.tagName)) {
+        return '\n\n' + plainTextListRange(list, range) + '\n\n';
+      }
+    }
+    if (/^h[1-6]$/.test(tag) || tag === 'p' || tag === 'pre' || tag === 'blockquote' ||
+        tag === 'div' || tag === 'section' || tag === 'article' || tag === 'table' ||
+        tag === 'thead' || tag === 'tbody') {
+      return '\n\n' + plainRangeChildren(n, range) + '\n\n';
+    }
+    return plainRangeChildren(n, range);
+  }
+
+  function plainTextListRange(listEl, range) {
+    var ordered = listEl.tagName.toLowerCase() === 'ol';
+    var num = parseInt(listEl.getAttribute('start') || '1', 10) || 1;
+    var out = [];
+    var idx = 0;
+    for (var k = 0; k < listEl.children.length; k++) {
+      var li = listEl.children[k];
+      if (li.tagName.toLowerCase() !== 'li') continue;
+      var liNo = idx;
+      idx++;
+      if (!range.intersectsNode(li)) continue;
+      var text = '';
+      var sub = '';
+      for (var c = li.firstChild; c; c = c.nextSibling) {
+        if (!range.intersectsNode(c)) continue;
+        if (c.nodeType === 1 && /^(ul|ol)$/i.test(c.tagName)) {
+          sub += rangeContainsNode(range, c)
+            ? indentLines(plainTextList(c, ''), '    ')
+            : indentLines(plainTextListRange(c, range), '    ');
+        } else {
+          text += plainRangeNode(c, range);
+        }
+      }
+      out.push((ordered ? (num + liNo) + '. ' : '• ') +
+        text.replace(/[\t ]*\n[\t ]*/g, ' ').trim());
+      if (sub) out.push(sub);
+    }
+    return out.join('\n') + '\n';
+  }
+
+  var copyTimer = null;
+  function flashCopyBtn(msg) {
+    copyBtn.textContent = msg;
+    clearTimeout(copyTimer);
+    copyTimer = setTimeout(function () { copyBtn.textContent = '复制'; }, 1500);
+  }
+
+  function doCopyContent(mode) {
+    var sel = contentSelection();
+    var text;
+    if (mode === 'md') {
+      text = sel ? selectionToMarkdown(sel)
+        : String((state.current && state.current.text) || '');
+    } else {
+      text = sel ? selectionToPlainText(sel) : contentPlainText();
+    }
+    if (!text) {
+      flashCopyBtn('无可复制内容');
+      return;
+    }
+    writeClipboard(text, function () { flashCopyBtn('已复制'); });
+  }
+
+  copyBtn.addEventListener('click', function () {
+    copyScope.textContent = contentSelection() ? '复制选中的内容' : '复制整篇文档';
+    copyMenu.classList.toggle('open');
+  });
+
+  copyMenu.addEventListener('click', function (e) {
+    var item = e.target.closest('[data-copy-mode]');
+    if (!item) return;
+    copyMenu.classList.remove('open');
+    doCopyContent(item.getAttribute('data-copy-mode'));
+  });
+
+  // 避免点工具栏时把内容区的选区清掉
+  copyWrap.addEventListener('mousedown', function (e) { e.preventDefault(); });
+
+  document.addEventListener('click', function (e) {
+    if (!copyWrap.contains(e.target)) copyMenu.classList.remove('open');
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') copyMenu.classList.remove('open');
+  });
+
+  /* ================= 拖拽 ================= */
+  var dragDepth = 0;
+  window.addEventListener('dragenter', function (e) {
+    e.preventDefault();
+    dragDepth++;
+    dropOverlay.classList.add('show');
+  });
+  window.addEventListener('dragleave', function (e) {
+    e.preventDefault();
+    if (--dragDepth <= 0) { dragDepth = 0; dropOverlay.classList.remove('show'); }
+  });
+  window.addEventListener('dragover', function (e) { e.preventDefault(); });
+  window.addEventListener('drop', function (e) {
+    e.preventDefault();
+    dragDepth = 0;
+    dropOverlay.classList.remove('show');
+    handleDrop(e.dataTransfer);
+  });
+
+  function handleDrop(dt) {
+    // Electron：File 对象带真实路径，走路径模式（图片/关联都能正常工作）
+    if (electronAvailable() && dt.files && dt.files.length) {
+      var paths = [];
+      for (var k = 0; k < dt.files.length; k++) {
+        var f = dt.files[k];
+        if (f.path && MD_EXT.test(f.name)) paths.push(f.path);
+      }
+      if (paths.length) {
+        openFileByPath(paths[0]);
+        return;
+      }
+    }
+    var items = Array.prototype.filter.call(dt.items || [], function (it) {
+      return it.kind === 'file';
+    });
+    if (!items.length) return;
+    var out = [];
+    var chain = Promise.resolve();
+    items.forEach(function (it) {
+      chain = chain.then(function () {
+        var en = it.webkitGetAsEntry && it.webkitGetAsEntry();
+        if (!en) return;
+        if (en.isDirectory) return scanEntry(en, '', out);
+        return new Promise(function (res, rej) { en.file(res, rej); }).then(function (f) {
+          out.push({ file: f, relPath: f.name });
+        }).catch(function () {});
+      });
+    });
+    chain.then(function () {
+      if (out.length) loadFiles(out);
+    });
+  }
+
+  function scanEntry(entry, prefix, out) {
+    if (entry.isFile) {
+      return new Promise(function (res, rej) { entry.file(res, rej); }).then(function (f) {
+        out.push({ file: f, relPath: prefix ? prefix + '/' + f.name : f.name });
+      }).catch(function () {});
+    }
+    if (entry.isDirectory) {
+      var reader = entry.createReader();
+      var dirPath = prefix ? prefix + '/' + entry.name : entry.name;
+      var all = Promise.resolve();
+      var readBatch = function () {
+        return new Promise(function (res, rej) { reader.readEntries(res, rej); }).then(function (entries) {
+          if (!entries.length) return;
+          entries.forEach(function (e) {
+            all = all.then(function () { return scanEntry(e, dirPath, out); });
+          });
+          return readBatch();
+        }).catch(function () {});
+      };
+      return readBatch();
+    }
+    return Promise.resolve();
+  }
+
+  /* ================= 初始化 ================= */
+  setTheme(state.theme);
+  showWelcome();
+
+  if (electronAvailable()) {
+    window.electronAPI.onOpenFile(function (p) { openFileByPath(p); });
+    window.electronAPI.onOpenDirectory(function (d) { openDirectoryByPath(d); });
+    window.electronAPI.onToggleTheme(function () {
+      setTheme(state.theme === 'dark' ? 'light' : 'dark');
+    });
+  }
+
+  function showWelcome() {
+    copyWrap.style.display = 'none';
+    contentEl.innerHTML =
+      '<div class="welcome">' +
+      '<h1>MD 查看器</h1>' +
+      '<p>支持完整 Markdown 渲染：标题、列表、表格、代码块、引用、任务列表、图片。</p>' +
+      '<div class="wbtns">' +
+      '<button onclick="document.getElementById(\'fileInput\').click()">打开文件</button>' +
+      '<button onclick="document.getElementById(\'dirInput\').click()">打开文件夹</button>' +
+      '</div>' +
+      '<p class="tip">也可以直接把 .md 文件或文件夹拖进窗口</p>' +
+      '<p class="tip">提示：把本文件放到 md 同目录，单个 md 里的相对路径图片也能正常显示</p>' +
+      '</div>';
+  }
+})();
+</script>
+</body>
+</html>
