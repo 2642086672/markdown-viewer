@@ -50,7 +50,7 @@
 
 ### 关于体积
 
-**MD Viewer Lite（Tauri）** 不打包 Chromium，直接使用系统 WebView（Windows WebView2 / macOS WKWebView）：Windows 安装包约 **2 MB**，macOS dmg 约 **3 MB**，安装后约 10 MB。
+**MD Viewer Lite（Tauri）** 不打包 Chromium，直接使用系统 WebView（Windows WebView2 / macOS WKWebView）：Windows 安装包 **2.02 MB**，macOS dmg **3.07 MB**，安装后约 10 MB。
 
 **MD Viewer（Electron）** 会把 Chromium 内核和 Node.js 一起打包，基础体积就在 100 MB 左右。1.1.1 已做体积优化：Electron 语言包从 55 套裁剪到 2 套（`zh-CN`、`en`），安装包启用 `maximum` 压缩，macOS DMG 改用 `ULFO` 格式。
 
