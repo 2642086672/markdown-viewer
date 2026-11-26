@@ -172,6 +172,13 @@ fn open_url(app: tauri::AppHandle, url: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn set_title(app: tauri::AppHandle, title: String) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.set_title(&title);
+    }
+}
+
+#[tauri::command]
 fn take_startup_path(state: State<'_, StartupPath>) -> Option<String> {
     state.0.lock().ok().and_then(|mut guard| guard.take())
 }
@@ -205,6 +212,7 @@ pub fn run() {
             pick_file,
             pick_directory,
             open_url,
+            set_title,
             take_startup_path
         ])
         .build(tauri::generate_context!())

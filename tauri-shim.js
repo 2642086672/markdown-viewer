@@ -207,17 +207,11 @@
 
   /* ================= 窗口标题同步 ================= */
   function installTitleSync() {
-    if (!tauri.window) return;
     var titleEl = document.querySelector('title');
     if (!titleEl || !window.MutationObserver) return;
-    try {
-      var win = tauri.window.getCurrentWindow();
-      new MutationObserver(function () {
-        win.setTitle(document.title).catch(function () {});
-      }).observe(titleEl, { childList: true });
-    } catch (e) {
-      /* 标题同步失败不影响功能 */
-    }
+    new MutationObserver(function () {
+      invoke('set_title', { title: document.title }).catch(function () {});
+    }).observe(titleEl, { childList: true });
   }
 
   tauri.event.listen('mdv-open-file', function (event) {
