@@ -1,0 +1,59 @@
+name: Tauri Check
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+    paths:
+      - 'src-tauri/**'
+      - 'tauri-shim.js'
+      - 'md-viewer.html'
+      - 'scripts/prepare-tauri.mjs'
+      - 'package.json'
+      - 'package-lock.json'
+  pull_request:
+    paths:
+      - 'src-tauri/**'
+      - 'tauri-shim.js'
+      - 'md-viewer.html'
+      - 'scripts/prepare-tauri.mjs'
+      - 'package.json'
+      - 'package-lock.json'
+
+jobs:
+  check:
+    name: Check ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - name: Install dependencies
+        run: npm ci
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+
+      - name: Prepare shared UI
+        run: npm run tauri:prepare
+
+      - name: Cargo check
+        run: cargo check --manifest-path src-tauri/Cargo.toml

@@ -1,6 +1,6 @@
 {
   "name": "markdown-viewer",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "description": "轻量、纯本地、零依赖的 Markdown 阅读器，基于 Electron（Windows / macOS）",
   "main": "main.js",
   "author": {
@@ -23,9 +23,13 @@
     "start": "electron .",
     "dist:win": "electron-builder --win --x64",
     "dist:mac-x64": "electron-builder --mac --x64",
-    "dist:mac-arm64": "electron-builder --mac --arm64"
+    "dist:mac-arm64": "electron-builder --mac --arm64",
+    "tauri:prepare": "node scripts/prepare-tauri.mjs",
+    "tauri:dev": "npm run tauri:prepare && tauri dev",
+    "tauri:build": "npm run tauri:prepare && tauri build"
   },
   "devDependencies": {
+    "@tauri-apps/cli": "2.12.6",
     "electron": "45.4.1",
     "electron-builder": "26.18.0"
   },
@@ -43,6 +47,7 @@
       "main.js",
       "preload.js",
       "md-viewer.html",
+      "tauri-shim.js",
       "assets/icon.png"
     ],
     "artifactName": "MD-Viewer-${version}-${arch}.${ext}",

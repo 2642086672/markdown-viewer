@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   build:
-    name: Build ${{ matrix.name }}
+    name: Electron ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -54,9 +54,87 @@ jobs:
             dist/*.exe
           if-no-files-found: error
 
+  tauri:
+    name: Tauri ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS Intel (x64)
+            os: macos-latest
+            rust_target: x86_64-apple-darwin
+            bundles: dmg
+            artifact: MD-Viewer-Lite-macOS-Intel
+          - name: Windows (x64)
+            os: windows-latest
+            rust_target: ''
+            bundles: nsis
+            artifact: MD-Viewer-Lite-Windows-x64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Add macOS Intel target
+        if: matrix.rust_target != ''
+        run: rustup target add ${{ matrix.rust_target }}
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - name: Install dependencies
+        run: npm ci
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+
+      - name: Prepare shared UI
+        run: npm run tauri:prepare
+
+      - name: Build Tauri
+        shell: bash
+        run: |
+          if [ -n "${{ matrix.rust_target }}" ]; then
+            npx tauri build --target ${{ matrix.rust_target }} --bundles ${{ matrix.bundles }}
+          else
+            npx tauri build --bundles ${{ matrix.bundles }}
+          fi
+
+      - name: Collect installers
+        shell: bash
+        run: |
+          mkdir -p dist
+          find src-tauri/target -path '*release/bundle*' \( -name '*.dmg' -o -name '*.exe' \) -exec cp {} dist/ \;
+          VERSION=$(node -p "require('./package.json').version")
+          for f in dist/*.dmg; do
+            [ -e "$f" ] && mv "$f" "dist/MD-Viewer-Lite-${VERSION}-x64.dmg"
+          done
+          for f in dist/*.exe; do
+            [ -e "$f" ] && mv "$f" "dist/MD-Viewer-Lite-${VERSION}-x64.exe"
+          done
+          ls -lh dist
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: dist/*
+          if-no-files-found: error
+
   release:
     name: Publish Release
-    needs: build
+    needs: [build, tauri]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:

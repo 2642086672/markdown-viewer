@@ -269,6 +269,7 @@
 <input type="file" id="fileInput" accept=".md,.markdown,.mdown,.mkd,.txt,.text" multiple hidden>
 <input type="file" id="dirInput" webkitdirectory hidden>
 
+<script src="tauri-shim.js"></script>
 <script>
 (function () {
   'use strict';
@@ -1705,8 +1706,8 @@
       '<h1>MD 查看器</h1>' +
       '<p>支持完整 Markdown 渲染：标题、列表、表格、代码块、引用、任务列表、图片。</p>' +
       '<div class="wbtns">' +
-      '<button onclick="document.getElementById(\'fileInput\').click()">打开文件</button>' +
-      '<button onclick="document.getElementById(\'dirInput\').click()">打开文件夹</button>' +
+      '<button onclick="document.getElementById(\'openFileBtn\').click()">打开文件</button>' +
+      '<button onclick="document.getElementById(\'openDirBtn\').click()">打开文件夹</button>' +
       '</div>' +
       '<p class="tip">也可以直接把 .md 文件或文件夹拖进窗口</p>' +
       '<p class="tip">提示：把本文件放到 md 同目录，单个 md 里的相对路径图片也能正常显示</p>' +

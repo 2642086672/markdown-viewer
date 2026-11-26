@@ -1,0 +1,25 @@
+[package]
+name = "md-viewer-lite"
+version = "1.2.0"
+description = "MD Viewer Lite - a lightweight Markdown viewer"
+authors = ["MarcusLong"]
+license = "Apache-2.0"
+repository = "https://github.com/2642086672/markdown-viewer"
+edition = "2021"
+rust-version = "1.90"
+
+[lib]
+name = "md_viewer_lite_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tauri-plugin-opener = "2"
+tauri-plugin-single-instance = "2"
+serde = { version = "1", features = ["derive"] }
+base64 = "0.22"
+url = "2"
