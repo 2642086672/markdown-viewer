@@ -47,7 +47,7 @@ Electron 应用会把 Chromium 内核和 Node.js 一起打包，基础体积就�
 | macOS Intel `.dmg` | 118.9 MB | **114.6 MB** |
 | macOS Intel `.zip` | 115.6 MB | **113.2 MB** |
 
-安装后磁盘占用约 230 MB（1.1.0 约 268 MB）。项目自己的 `app.asar` 只有约 0.1 MB，其余都是 Electron/Chromium 运行时。若要 10 MB 级别的安装包，需要改用系统自带 WebView 的方案（Tauri / Wails 等）重写外壳。
+安装后仅语言包一项就少占用约 39 MB（从 40.3 MB 降到 1.4 MB）。项目自己的 `app.asar` 只有约 0.1 MB，其余都是 Electron/Chromium 运行时。若要 10 MB 级别的安装包，需要改用系统自带 WebView 的方案（Tauri / Wails 等）重写外壳。
 
 ### macOS 说明
 
