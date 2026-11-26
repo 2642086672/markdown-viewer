@@ -37,6 +37,18 @@
 | Windows x64 | `MD-Viewer-1.1.1-x64.exe` |
 | macOS Intel (x64) | `MD-Viewer-1.1.1-x64.dmg`（或 `-x64.zip`） |
 
+### 关于体积
+
+Electron 应用会把 Chromium 内核和 Node.js 一起打包，基础体积就在 100 MB 左右。1.1.1 已做体积优化：Electron 语言包从 55 套裁剪到 2 套（`zh-CN`、`en`），安装包启用 `maximum` 压缩，macOS DMG 改用 `ULFO` 格式。
+
+| 文件 | 1.1.0 | 1.1.1 |
+| --- | --- | --- |
+| Windows x64 `.exe` | 115.7 MB | **107.7 MB** |
+| macOS Intel `.dmg` | 118.9 MB | **114.6 MB** |
+| macOS Intel `.zip` | 115.6 MB | **113.2 MB** |
+
+安装后磁盘占用约 230 MB（1.1.0 约 268 MB）。项目自己的 `app.asar` 只有约 0.1 MB，其余都是 Electron/Chromium 运行时。若要 10 MB 级别的安装包，需要改用系统自带 WebView 的方案（Tauri / Wails 等）重写外壳。
+
 ### macOS 说明
 
 安装包没有 Apple 开发者签名和公证（`未签名`）。首次打开时 macOS 会拦截，请任选其一：
