@@ -34,8 +34,8 @@
 
 | 平台 | 文件 |
 | --- | --- |
-| Windows x64 | `MD-Viewer-1.1.0-x64.exe` |
-| macOS Intel (x64) | `MD-Viewer-1.1.0-x64.dmg`（或 `-x64.zip`） |
+| Windows x64 | `MD-Viewer-1.1.1-x64.exe` |
+| macOS Intel (x64) | `MD-Viewer-1.1.1-x64.dmg`（或 `-x64.zip`） |
 
 ### macOS 说明
 

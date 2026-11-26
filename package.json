@@ -1,6 +1,6 @@
 {
   "name": "markdown-viewer",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "轻量、纯本地、零依赖的 Markdown 阅读器，基于 Electron（Windows / macOS）",
   "main": "main.js",
   "author": {
@@ -33,6 +33,8 @@
     "appId": "cn.pursueray.mdviewer",
     "productName": "MD Viewer",
     "asar": true,
+    "compression": "maximum",
+    "electronLanguages": ["zh-CN", "en"],
     "directories": {
       "output": "dist",
       "buildResources": "build"
@@ -64,7 +66,8 @@
       ]
     },
     "dmg": {
-      "title": "MD Viewer ${version}"
+      "title": "MD Viewer ${version}",
+      "format": "ULFO"
     },
     "win": {
       "icon": "build/icon.png",
